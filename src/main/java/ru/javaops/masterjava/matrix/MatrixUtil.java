@@ -15,6 +15,23 @@ public class MatrixUtil {
         final int matrixSize = matrixA.length;
         final int[][] matrixC = new int[matrixSize][matrixSize];
 
+        int[][] matrixBT = new int[matrixB[0].length][matrixB.length];
+        for (int y = 0; y < matrixB[0].length; y++) {
+            for (int x = 0; x < matrixB.length; x++) {
+                matrixBT[y][x] = matrixB[x][y];
+            }
+        }
+
+        for (int y = 0; y < matrixA[0].length; y++) {
+            for (int x = 0; x < matrixA.length; x++) {
+                int summand = 0;
+                for (int i = 0; i < matrixBT[0].length; i++) {
+                    summand += matrixA[y][i] * matrixBT[x][i];
+                }
+                matrixC[y][x] = summand;
+            }
+        }
+
         return matrixC;
     }
 
