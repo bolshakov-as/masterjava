@@ -30,12 +30,19 @@ public class MainMatrix {
             singleThreadSum += duration;
 
             start = System.currentTimeMillis();
-            final int[][] concurrentMatrixC = MatrixUtil.concurrentMultiply(matrixA, matrixB, executor);
+            final Integer[][] concurrentMatrixC = MatrixUtil.concurrentMultiply(matrixA, matrixB, executor);
             duration = (System.currentTimeMillis() - start) / 1000.;
             out("Concurrent thread time, sec: %.3f", duration);
             concurrentThreadSum += duration;
 
-            if (!MatrixUtil.compare(matrixC, concurrentMatrixC)) {
+            int[][] conMatrixC = new int[concurrentMatrixC.length][concurrentMatrixC[0].length];
+            for (int i = 0; i < concurrentMatrixC.length; i++) {
+                for (int j = 0; j < concurrentMatrixC[0].length; j++) {
+                    conMatrixC[i][j] = concurrentMatrixC[i][j];
+                }
+            }
+
+            if (!MatrixUtil.compare(matrixC, conMatrixC)) {
                 System.err.println("Comparison failed");
                 break;
             }

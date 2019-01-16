@@ -1,8 +1,15 @@
 package ru.javaops.masterjava.matrix;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 /**
  * gkislin
@@ -11,42 +18,83 @@ import java.util.concurrent.ExecutorService;
 public class MatrixUtil {
 
     // TODO implement parallel multiplication matrixA*matrixB
-    public static int[][] concurrentMultiply(int[][] matrixA, int[][] matrixB, ExecutorService executor) throws InterruptedException, ExecutionException {
+    public static Integer[][] concurrentMultiply(int[][] matrixA, int[][] matrixB, ExecutorService executor) throws InterruptedException, ExecutionException {
         final int matrixSize = matrixA.length;
-        final int[][] matrixC = new int[matrixSize][matrixSize];
+        final Integer[][] matrixC = new Integer[matrixSize][matrixSize];
 
-        int[][] matrixBT = new int[matrixB[0].length][matrixB.length];
-        for (int y = 0; y < matrixB[0].length; y++) {
-            for (int x = 0; x < matrixB.length; x++) {
-                matrixBT[y][x] = matrixB[x][y];
-            }
+        final CompletionService<Boolean> completionService = new ExecutorCompletionService<>(executor);
+        final List<Future<Boolean>> futures = new ArrayList<>();
+
+        final int bColumns = matrixB[0].length;
+        final int aColumns = matrixA[0].length;
+        final int aRows = matrixA.length;
+
+        for (int bColumn = 0; bColumn < bColumns; bColumn++) {
+            final int fbRowColumn = bColumn;
+            futures.add(completionService.submit(
+                    () -> {
+                        int tempColumn[] = new int[matrixB.length];
+                        for (int aColumn = 0; aColumn < aColumns; aColumn++) {
+                            tempColumn[aColumn] = matrixB[aColumn][fbRowColumn];
+                        }
+                        for (int aRow = 0; aRow < aRows; aRow++) {
+                            int thisRow[] = matrixA[aRow];
+                            int sum = 0;
+                            for (int aColumn = 0; aColumn < aColumns; aColumn++) {
+                                sum += thisRow[aColumn] * tempColumn[aColumn];
+                            }
+                            matrixC[aRow][fbRowColumn] = sum;
+                        }
+                        return true;
+                    }
+            ));
         }
 
-        for (int y = 0; y < matrixA[0].length; y++) {
-            for (int x = 0; x < matrixA.length; x++) {
-                int summand = 0;
-                for (int i = 0; i < matrixBT[0].length; i++) {
-                    summand += matrixA[y][i] * matrixBT[x][i];
+        return new Callable<Integer[][]>() {
+            @Override
+            public Integer[][] call() {
+                while (!futures.isEmpty()) {
+                    try {
+                        Future<Boolean> future = completionService.poll(10, TimeUnit.SECONDS);
+                        if (future == null) {
+                            return cancelWithFail();
+                        }
+                        futures.remove(future);
+                    } catch (InterruptedException e) {
+                        return cancelWithFail();
+                    }
+
                 }
-                matrixC[y][x] = summand;
+                return matrixC;
             }
-        }
 
-        return matrixC;
+            private Integer[][] cancelWithFail() {
+                futures.forEach(f -> f.cancel(true));
+                return new Integer[0][0];
+            }
+        }.call();
     }
 
     // TODO optimize by https://habrahabr.ru/post/114797/
     public static int[][] singleThreadMultiply(int[][] matrixA, int[][] matrixB) {
         final int matrixSize = matrixA.length;
         final int[][] matrixC = new int[matrixSize][matrixSize];
-
-        for (int i = 0; i < matrixSize; i++) {
-            for (int j = 0; j < matrixSize; j++) {
+        int tempColumn[] = new int[matrixB.length];
+        final int bColumns = matrixB[0].length;
+        final int aColumns = matrixA[0].length;
+        final int aRows = matrixA.length;
+        for (int bColumn = 0; bColumn < bColumns; bColumn++) {
+            final int fbRowColumn = bColumn;
+            for (int aColumn = 0; aColumn < aColumns; aColumn++) {
+                tempColumn[aColumn] = matrixB[aColumn][fbRowColumn];
+            }
+            for (int aRow = 0; aRow < aRows; aRow++) {
+                int thisRow[] = matrixA[aRow];
                 int sum = 0;
-                for (int k = 0; k < matrixSize; k++) {
-                    sum += matrixA[i][k] * matrixB[k][j];
+                for (int aColumn = 0; aColumn < aColumns; aColumn++) {
+                    sum += thisRow[aColumn] * tempColumn[aColumn];
                 }
-                matrixC[i][j] = sum;
+                matrixC[aRow][fbRowColumn] = sum;
             }
         }
         return matrixC;
